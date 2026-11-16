@@ -1,0 +1,106 @@
+@if (room.status() !== 'live') {
+  <main class="join">
+    <h1>AI Group Live <small>A live room where every host is an AI</small></h1>
+    <p class="sub">Chat with a cast of AI hosts, send virtual gifts, and watch PK battles and performances.</p>
+    <form (ngSubmit)="enter()">
+      <input
+        name="nickname"
+        [ngModel]="nickname()"
+        (ngModelChange)="nickname.set($event)"
+        maxlength="16"
+        placeholder="Enter a nickname"
+        autocomplete="off"
+      />
+      <button type="submit" [disabled]="!nickname().trim() || room.status() === 'connecting'">
+        {{ room.status() === 'connecting' ? 'Connecting...' : 'Join the room' }}
+      </button>
+    </form>
+    @if (speech.supported) {
+      <label class="voice">
+        <input type="checkbox" [checked]="speech.enabled()" (change)="speech.toggle()" />
+        Enable host voices (browser text-to-speech)
+      </label>
+    }
+    @if (room.lastError(); as err) {
+      <p class="err">{{ err }}</p>
+    } @else if (room.status() === 'closed') {
+      <p class="err">Disconnected. Make sure the backend is running on port 8000.</p>
+    }
+    <p class="note">All hosts are AI and all their content is AI-generated. Gifts use virtual coins only; no real payments.</p>
+  </main>
+} @else {
+  <div class="layout">
+    <header>
+      <h1>AI Group Live</h1>
+      <span class="badge">All hosts are AI · AI-generated content</span>
+      <span class="spacer"></span>
+      <span>👀 {{ room.viewers() }}</span>
+      <span>🙋 {{ room.me()?.name }}</span>
+      <button type="button" class="ghost" (click)="speech.toggle()" [disabled]="!speech.supported">
+        {{ speech.enabled() ? '🔊 Voice on' : '🔇 Voice off' }}
+      </button>
+    </header>
+
+    <div class="main">
+      @if (room.pk(); as pk) {
+        <app-pk-bar [pk]="pk" [anchors]="room.anchorById()" />
+      }
+
+      <section class="stage">
+        @for (a of room.anchors(); track a.id) {
+          <app-anchor-card
+            [anchor]="a"
+            [bubble]="room.bubbles()[a.id]"
+            [speaking]="room.speakingId() === a.id"
+            [popularity]="room.popularity()[a.id] ?? 0"
+            [pkScore]="pkScore(a.id)"
+            [selected]="targetId() === a.id"
+            (pick)="selected.set($event)"
+          />
+        }
+      </section>
+
+      <section class="controls">
+        <app-gift-bar
+          [gifts]="room.gifts()"
+          [target]="target()"
+          [coins]="room.me()?.coins ?? 0"
+          (send)="sendGift($event)"
+        />
+        <div class="pk-start">
+          <span>Start a PK:</span>
+          <select [value]="pkA()" (change)="pkA.set($any($event.target).value)" aria-label="PK anchor A">
+            <option value="">Choose anchor</option>
+            @for (a of room.anchors(); track a.id) {
+              <option [value]="a.id">{{ a.name }}</option>
+            }
+          </select>
+          <span>vs</span>
+          <select [value]="pkB()" (change)="pkB.set($any($event.target).value)" aria-label="PK anchor B">
+            <option value="">Choose anchor</option>
+            @for (a of room.anchors(); track a.id) {
+              <option [value]="a.id">{{ a.name }}</option>
+            }
+          </select>
+          <button type="button" [disabled]="!canStartPk()" (click)="startPk()">Start</button>
+        </div>
+      </section>
+    </div>
+
+    <aside class="side">
+      <app-chat-panel [feed]="room.feed()" (send)="room.sendChat($event)" />
+      <div class="board">
+        <h2>Top supporters</h2>
+        @for (item of room.leaderboard(); track item.name; let i = $index) {
+          <div class="row">
+            <span class="rank">{{ i + 1 }}</span>
+            <span class="who">{{ item.name }}</span>
+            <span class="total">{{ item.total }}</span>
+          </div>
+        } @empty {
+          <div class="empty">No gifts yet</div>
+        }
+      </div>
+    </aside>
+  </div>
+}
